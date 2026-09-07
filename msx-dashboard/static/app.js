@@ -108,6 +108,11 @@ function renderCsvDashboard(data) {
     toggle("forecast-card", true);
     renderAzureForecast(data.azure_forecast);
   }
+
+  if (data.service_trends) {
+    toggle("trends-card", true);
+    renderServiceTrends(data.service_trends);
+  }
 }
 
 let forecastChart = null;
@@ -254,6 +259,44 @@ function renderMockOrLiveDashboard(data) {
       <td>${o.close_date || o.estimatedclosedate || ""}</td>
       <td>${o.probability ?? o.closeprobability ?? ""}${(o.probability ?? o.closeprobability) !== undefined ? "%" : ""}</td>
     </tr>`).join("") || `<tr><td colspan="5">No open opportunities found.</td></tr>`;
+}
+
+let trendsState = null;
+
+function renderServiceTrends(trends) {
+  trendsState = trends;
+  document.querySelectorAll("#trends-tabs .tab-btn").forEach(btn => {
+    btn.onclick = () => {
+      document.querySelectorAll("#trends-tabs .tab-btn").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      drawTrendsTable(btn.dataset.bucket);
+    };
+  });
+  drawTrendsTable("going_up");
+}
+
+function drawTrendsTable(bucket) {
+  const rows = trendsState[bucket] || [];
+  const head = document.getElementById("trends-table-head");
+  const body = document.querySelector("#trends-table tbody");
+
+  if (bucket === "not_used") {
+    head.innerHTML = "<th>Service</th><th>Total ACR (historical)</th><th>Last Month ACR</th>";
+    body.innerHTML = rows.map(s => `
+      <tr><td>${s.service}</td><td>${formatCurrency(s.total_acr)}</td><td>${formatCurrency(s.last_month_acr)}</td></tr>`
+    ).join("") || `<tr><td colspan="3">No services found in this category.</td></tr>`;
+    return;
+  }
+
+  head.innerHTML = "<th>Service</th><th>Last Month ACR</th><th>MoM %</th><th>QoQ %</th><th>YoY %</th>";
+  body.innerHTML = rows.map(s => `
+    <tr>
+      <td>${s.service}</td>
+      <td>${formatCurrency(s.last_month_acr)}</td>
+      <td>${s.mom_pct}%</td>
+      <td>${s.qoq_pct}%</td>
+      <td>${s.yoy_pct}%</td>
+    </tr>`).join("") || `<tr><td colspan="5">No services found in this category.</td></tr>`;
 }
 
 function guessNameField(account) {

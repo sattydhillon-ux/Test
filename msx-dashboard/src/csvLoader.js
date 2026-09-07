@@ -109,6 +109,43 @@ function getTopServices(limit = 15) {
     .slice(0, limit);
 }
 
+/** Full service list (no limit) bucketed by month-over-month trend, for the
+ * "Going Up / Going Down / Not In Use" tabs. */
+function getServiceTrends() {
+  const rows = readCsvRecords("service_level_acr.csv", 3);
+  if (rows.length === 0) return { going_up: [], going_down: [], not_used: [] };
+
+  const keys = Object.keys(rows[0]);
+  const totalAcrKey = keys.find((k) => k.startsWith("Total ACR"));
+  const lastMonthKey = keys.find((k) => k.startsWith("Last Month ACR"));
+  const momKey = keys.find((k) => k.startsWith("MoM"));
+  const qoqKey = keys.find((k) => k.startsWith("QoQ"));
+  const yoyKey = keys.find((k) => k.startsWith("YoY"));
+
+  const services = rows
+    .map((r) => ({
+      service: r["Service or FRA group"],
+      total_acr: toNumber(r[totalAcrKey]),
+      last_month_acr: toNumber(r[lastMonthKey]),
+      mom_pct: toNumber(r[momKey]),
+      qoq_pct: toNumber(r[qoqKey]),
+      yoy_pct: toNumber(r[yoyKey]),
+    }))
+    .filter((r) => r.service);
+
+  const notUsed = services
+    .filter((s) => s.last_month_acr === 0)
+    .sort((a, b) => b.total_acr - a.total_acr);
+  const goingUp = services
+    .filter((s) => s.last_month_acr > 0 && s.mom_pct > 0)
+    .sort((a, b) => b.mom_pct - a.mom_pct);
+  const goingDown = services
+    .filter((s) => s.last_month_acr > 0 && s.mom_pct < 0)
+    .sort((a, b) => a.mom_pct - b.mom_pct);
+
+  return { going_up: goingUp, going_down: goingDown, not_used: notUsed };
+}
+
 function getSubscriptionsSummary() {
   const rows = readCsvRecords("subscriptions.csv", 3);
   const statusCounts = {};
@@ -180,6 +217,7 @@ function getDashboard(tpid) {
     },
     revenue_by_month: monthlyRevenue,
     top_services: getTopServices(),
+    service_trends: getServiceTrends(),
     subscriptions_summary: getSubscriptionsSummary(),
     recommendations,
     rob_summary: {
