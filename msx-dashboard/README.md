@@ -21,24 +21,44 @@ Open http://127.0.0.1:8000 in your browser.
 
 ## Switching to live MSX data
 
-1. Get from your MSX admin / IT:
-   - MSX org URL (e.g. `https://<org>.crm.dynamics.com`)
-   - An Azure AD App Registration with the Dynamics CRM `user_impersonation`
-     API permission → Tenant ID, Client ID, Client Secret
-   - Confirmation of the TPID field's schema name on the Account entity
-     (commonly `msp_tpid`, but may differ per environment)
-2. Edit `.env`:
+Your MSX org URL and the account entity are already pre-filled based on the
+Customer 360 view link you shared:
+- Org URL: `https://microsoftsales.crm.dynamics.com`
+- Entity: `msp_customer360s` (schema/field names are best-effort — confirm
+  with your MSX admin and adjust `MSX_ENTITY_SET`/`MSX_TPID_FIELD` if needed)
+
+1. Edit `.env`:
    ```
    MSX_MODE=live
-   MSX_ORG_URL=https://<org>.crm.dynamics.com
+   ```
+   That's it for a first try — `MSX_AUTH_MODE=device_code` is the default,
+   which signs in as **you** and needs no Azure AD app registration.
+2. Run `npm start`, then open http://127.0.0.1:8000/api/dashboard?tpid=5684700
+   (or the viewer). On first call, watch the **server console** — it prints
+   something like:
+   ```
+   [MSX auth] To sign in, use a web browser to open the page
+   https://microsoft.com/devicelogin and enter the code ABC-DEF-GHI to authenticate.
+   ```
+   Open that URL, enter the code, sign in with your Microsoft corporate
+   account (MFA as usual). The token is cached in memory and silently
+   refreshed until it expires — you'll be prompted again via the console
+   when that happens.
+3. If device-code sign-in is blocked in your tenant (conditional access
+   policies, etc.), fall back to `client_credentials` mode instead:
+   ```
+   MSX_AUTH_MODE=client_credentials
    MSX_TENANT_ID=...
    MSX_CLIENT_ID=...
    MSX_CLIENT_SECRET=...
-   MSX_TPID_FIELD=msp_tpid
-   MSX_TARGET_TPID=5684700
    ```
-3. Restart the server. The viewer UI needs no changes — it consumes
-   `/api/dashboard` the same way in both modes.
+   (needs an admin to create an Azure AD app registration with API
+   permission to this Dynamics instance).
+
+The viewer UI needs no changes for either mode — it renders whatever fields
+`/api/dashboard` returns, including any fields on the live record it doesn't
+explicitly recognize yet (so nothing gets silently dropped while you confirm
+the exact `msp_customer360` schema).
 
 ## Project layout
 

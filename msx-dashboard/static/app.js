@@ -18,12 +18,14 @@ async function loadDashboard() {
 function render(data) {
   const { account, revenue_by_year, opportunities, rob_summary, source } = data;
 
-  document.getElementById("account-name").textContent = account.name || "Unknown Account";
+  const displayName =
+    account.name || account.msp_name || account.msp_customer360name || guessNameField(account) || "Unknown Account";
+  document.getElementById("account-name").textContent = displayName;
   const badge = document.getElementById("mode-badge");
   badge.textContent = source === "live" ? "Live MSX Data" : "Mock Data";
 
   const details = document.getElementById("account-details");
-  const fields = [
+  const knownFields = [
     ["TPID", account.msp_tpid || account.tpid],
     ["Industry", account.industry || account.industrycode],
     ["Segment", account.segment],
@@ -32,7 +34,21 @@ function render(data) {
     ["State/Province", account.state || account.address1_stateorprovince],
     ["Account Owner", account.account_owner],
   ].filter(([, v]) => v !== undefined && v !== null && v !== "");
-  details.innerHTML = fields.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("");
+
+  // Live mode: the real msp_customer360 schema is unconfirmed, so also show
+  // any other non-empty, non-system fields we didn't already map above,
+  // instead of silently dropping data we don't recognize yet.
+  const knownKeys = new Set(["name", "msp_tpid", "tpid", "industry", "industrycode", "segment", "region", "city",
+    "address1_city", "state", "address1_stateorprovince", "account_owner"]);
+  const extraFields = source === "live"
+    ? Object.entries(account)
+        .filter(([k, v]) => !knownKeys.has(k) && !k.startsWith("_") && !k.endsWith("@odata.type") &&
+          v !== null && v !== undefined && v !== "" && typeof v !== "object")
+    : [];
+
+  details.innerHTML = [...knownFields, ...extraFields]
+    .map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`)
+    .join("");
 
   const stats = document.getElementById("rob-stats");
   const statFields = [
@@ -63,6 +79,11 @@ function render(data) {
       <td>${o.close_date || o.estimatedclosedate || ""}</td>
       <td>${o.probability ?? o.closeprobability ?? ""}${(o.probability ?? o.closeprobability) !== undefined ? "%" : ""}</td>
     </tr>`).join("") || `<tr><td colspan="5">No open opportunities found.</td></tr>`;
+}
+
+function guessNameField(account) {
+  const key = Object.keys(account).find(k => /name/i.test(k) && typeof account[k] === "string");
+  return key ? account[key] : null;
 }
 
 loadDashboard();

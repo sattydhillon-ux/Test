@@ -1,24 +1,32 @@
-/** Client for the live MSX (Dynamics 365) Web API.
+/** Client for the live MSX (Dynamics 365 / Dataverse) Web API.
  *
- * Uses the OAuth2 client-credentials flow (MSAL) against Azure AD, then
- * calls the Dynamics 365 Web API (OData v4) to look up an Account by its
- * TPID field and pull related Opportunities.
+ * Supports two auth modes (see MSX_AUTH_MODE in .env):
  *
- * NOTE: Field/entity names (msp_tpid, opportunity schema, etc.) are the
- * common Dynamics 365 defaults but MAY differ in your MSX environment.
- * Confirm the real schema names with your MSX admin and adjust the queries
- * below.
+ *  - "device_code" (default): delegated sign-in as you. No Azure AD app
+ *    registration needed — on first API call the server prints a URL + code
+ *    to its console; open the URL, enter the code, sign in with your
+ *    Microsoft corporate account. The token is cached in memory and reused
+ *    (silently refreshed) until it expires, at which point you'll be
+ *    prompted again via the console.
+ *
+ *  - "client_credentials": service-to-service auth using a full Azure AD
+ *    app registration (Client ID/Secret). Needs an admin to set that up.
+ *
+ * NOTE: Entity/field names (msp_customer360, msp_tpid, opportunity schema,
+ * etc.) are best-effort based on the MSX Customer 360 view URL you shared.
+ * Confirm exact field schema names (Settings > Customizations, or ask your
+ * MSX admin) and adjust the queries below if needed.
  */
-const { ConfidentialClientApplication } = require("@azure/msal-node");
+const { PublicClientApplication, ConfidentialClientApplication } = require("@azure/msal-node");
 const settings = require("./config");
 
 class MsxAuthError extends Error {}
 class MsxApiError extends Error {}
 
-let msalApp = null;
-function getMsalApp() {
-  if (!msalApp) {
-    msalApp = new ConfidentialClientApplication({
+let confidentialApp = null;
+function getConfidentialApp() {
+  if (!confidentialApp) {
+    confidentialApp = new ConfidentialClientApplication({
       auth: {
         clientId: settings.clientId,
         authority: `https://login.microsoftonline.com/${settings.tenantId}`,
@@ -26,12 +34,58 @@ function getMsalApp() {
       },
     });
   }
-  return msalApp;
+  return confidentialApp;
 }
 
-async function getAccessToken() {
+let publicApp = null;
+function getPublicApp() {
+  if (!publicApp) {
+    publicApp = new PublicClientApplication({
+      auth: {
+        clientId: settings.clientId,
+        authority: `https://login.microsoftonline.com/${settings.tenantId}`,
+      },
+    });
+  }
+  return publicApp;
+}
+
+// In-memory cache of the signed-in account, so we can try a silent token
+// refresh before falling back to a fresh device-code prompt.
+let cachedAccount = null;
+
+async function getAccessTokenDeviceCode() {
+  const app = getPublicApp();
+  const scopes = [`${settings.orgUrl}/.default`];
+
+  if (cachedAccount) {
+    try {
+      const silent = await app.acquireTokenSilent({ account: cachedAccount, scopes });
+      return silent.accessToken;
+    } catch {
+      // Silent refresh failed (expired/revoked) — fall through to device code.
+      cachedAccount = null;
+    }
+  }
+
   try {
-    const result = await getMsalApp().acquireTokenByClientCredential({
+    const result = await app.acquireTokenByDeviceCode({
+      scopes,
+      deviceCodeCallback: (response) => {
+        // eslint-disable-next-line no-console
+        console.log(`\n[MSX auth] ${response.message}\n`);
+      },
+    });
+    cachedAccount = result.account;
+    return result.accessToken;
+  } catch (err) {
+    throw new MsxAuthError(err.message || "Device code sign-in failed");
+  }
+}
+
+async function getAccessTokenClientCredentials() {
+  try {
+    const result = await getConfidentialApp().acquireTokenByClientCredential({
       scopes: [`${settings.orgUrl}/.default`],
     });
     if (!result || !result.accessToken) {
@@ -41,6 +95,10 @@ async function getAccessToken() {
   } catch (err) {
     throw new MsxAuthError(err.message || "Failed to acquire MSX access token");
   }
+}
+
+function getAccessToken() {
+  return settings.isDeviceCode ? getAccessTokenDeviceCode() : getAccessTokenClientCredentials();
 }
 
 async function apiGet(path, params) {
@@ -64,26 +122,23 @@ async function apiGet(path, params) {
 }
 
 async function getLiveDashboard(tpid) {
-  const accountFilter = `${settings.tpidField} eq '${tpid}'`;
-  const accountData = await apiGet("accounts", {
-    $filter: accountFilter,
-    $select: `accountid,name,${settings.tpidField},industrycode,address1_city,address1_stateorprovince`,
+  const filter = `${settings.tpidField} eq '${tpid}'`;
+  const customerData = await apiGet(settings.entitySetName, {
+    $filter: filter,
   });
-  const accounts = accountData.value || [];
-  if (accounts.length === 0) {
-    throw new MsxApiError(`No account found in MSX for TPID ${tpid}`);
+  const records = customerData.value || [];
+  if (records.length === 0) {
+    throw new MsxApiError(
+      `No record found in MSX entity "${settings.entitySetName}" for TPID ${tpid}. ` +
+        `Confirm the entity set name and field ${settings.tpidField} with your MSX admin.`
+    );
   }
-  const account = accounts[0];
-
-  const oppData = await apiGet("opportunities", {
-    $filter: `_parentaccountid_value eq ${account.accountid}`,
-    $select: "name,estimatedvalue,estimatedclosedate,stepname,closeprobability",
-  });
+  const record = records[0];
 
   return {
-    account,
+    account: record,
     revenue_by_year: [], // Populate from your MSX revenue/consumption entity
-    opportunities: oppData.value || [],
+    opportunities: [], // Populate from your MSX opportunity/pipeline entity, filtered by this account
     rob_summary: {}, // Populate from your MSX ROB/consumption summary entity
     source: "live",
   };
