@@ -12,7 +12,14 @@
     <span id="mode-badge" class="badge">…</span>
   </header>
 
-  <main>
+  <nav id="main-nav" class="main-nav">
+    <button class="nav-btn active" data-view="home">Home</button>
+    <button class="nav-btn" data-view="going_up">📈 Going Up</button>
+    <button class="nav-btn" data-view="going_down">📉 Going Down</button>
+    <button class="nav-btn" data-view="not_used">🚫 Not In Use</button>
+  </nav>
+
+  <main id="view-home" class="view">
     <section class="card" id="account-card">
       <h2>Account</h2>
       <dl id="account-details"></dl>
@@ -57,19 +64,6 @@
       </table>
     </section>
 
-    <section class="card" id="trends-card" style="display:none;">
-      <h2>Service Trends (Month over Month)</h2>
-      <div class="tabs" id="trends-tabs">
-        <button class="tab-btn active" data-bucket="going_up">📈 Going Up</button>
-        <button class="tab-btn" data-bucket="going_down">📉 Going Down</button>
-        <button class="tab-btn" data-bucket="not_used">🚫 Not In Use</button>
-      </div>
-      <table id="trends-table">
-        <thead><tr id="trends-table-head"></tr></thead>
-        <tbody></tbody>
-      </table>
-    </section>
-
     <section class="card" id="subscriptions-card" style="display:none;">
       <h2>Subscriptions Summary</h2>
       <div class="stat-grid" id="subscriptions-stats"></div>
@@ -84,6 +78,48 @@
       <h2>Cost Optimization Recommendations</h2>
       <table id="recommendations-table">
         <thead><tr><th>Type</th><th>Description</th><th>Term</th><th>Net Savings</th><th>Savings %</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </section>
+  </main>
+
+  <main id="view-going_up" class="view" style="display:none;">
+    <section class="card">
+      <h2>📈 Services Going Up (Month over Month)</h2>
+      <div class="filter-bar">
+        <input type="search" id="going_up-filter" placeholder="Filter by service name…" />
+        <span class="filter-count" id="going_up-count"></span>
+      </div>
+      <table id="going_up-table">
+        <thead><tr><th>Service</th><th>Last Month ACR</th><th>MoM %</th><th>QoQ %</th><th>YoY %</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </section>
+  </main>
+
+  <main id="view-going_down" class="view" style="display:none;">
+    <section class="card">
+      <h2>📉 Services Going Down (Month over Month)</h2>
+      <div class="filter-bar">
+        <input type="search" id="going_down-filter" placeholder="Filter by service name…" />
+        <span class="filter-count" id="going_down-count"></span>
+      </div>
+      <table id="going_down-table">
+        <thead><tr><th>Service</th><th>Last Month ACR</th><th>MoM %</th><th>QoQ %</th><th>YoY %</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </section>
+  </main>
+
+  <main id="view-not_used" class="view" style="display:none;">
+    <section class="card">
+      <h2>🚫 Services Not In Use (Last Month)</h2>
+      <div class="filter-bar">
+        <input type="search" id="not_used-filter" placeholder="Filter by service name…" />
+        <span class="filter-count" id="not_used-count"></span>
+      </div>
+      <table id="not_used-table">
+        <thead><tr><th>Service</th><th>Total ACR (historical)</th><th>Last Month ACR</th></tr></thead>
         <tbody></tbody>
       </table>
     </section>

@@ -110,8 +110,8 @@ function renderCsvDashboard(data) {
   }
 
   if (data.service_trends) {
-    toggle("trends-card", true);
-    renderServiceTrends(data.service_trends);
+    trendsState = data.service_trends;
+    ["going_up", "going_down", "not_used"].forEach(bucket => drawTrendsPage(bucket));
   }
 }
 
@@ -263,32 +263,26 @@ function renderMockOrLiveDashboard(data) {
 
 let trendsState = null;
 
-function renderServiceTrends(trends) {
-  trendsState = trends;
-  document.querySelectorAll("#trends-tabs .tab-btn").forEach(btn => {
-    btn.onclick = () => {
-      document.querySelectorAll("#trends-tabs .tab-btn").forEach(b => b.classList.remove("active"));
-      btn.classList.add("active");
-      drawTrendsTable(btn.dataset.bucket);
-    };
-  });
-  drawTrendsTable("going_up");
+function drawTrendsPage(bucket) {
+  const filterInput = document.getElementById(`${bucket}-filter`);
+  const render = () => renderTrendsRows(bucket, filterInput.value.trim().toLowerCase());
+  filterInput.oninput = render;
+  render();
 }
 
-function drawTrendsTable(bucket) {
-  const rows = trendsState[bucket] || [];
-  const head = document.getElementById("trends-table-head");
-  const body = document.querySelector("#trends-table tbody");
+function renderTrendsRows(bucket, filterText) {
+  const all = trendsState[bucket] || [];
+  const rows = filterText ? all.filter(s => s.service.toLowerCase().includes(filterText)) : all;
+  const body = document.querySelector(`#${bucket}-table tbody`);
+  document.getElementById(`${bucket}-count`).textContent = `${rows.length} of ${all.length} services`;
 
   if (bucket === "not_used") {
-    head.innerHTML = "<th>Service</th><th>Total ACR (historical)</th><th>Last Month ACR</th>";
     body.innerHTML = rows.map(s => `
       <tr><td>${s.service}</td><td>${formatCurrency(s.total_acr)}</td><td>${formatCurrency(s.last_month_acr)}</td></tr>`
-    ).join("") || `<tr><td colspan="3">No services found in this category.</td></tr>`;
+    ).join("") || `<tr><td colspan="3">No matching services.</td></tr>`;
     return;
   }
 
-  head.innerHTML = "<th>Service</th><th>Last Month ACR</th><th>MoM %</th><th>QoQ %</th><th>YoY %</th>";
   body.innerHTML = rows.map(s => `
     <tr>
       <td>${s.service}</td>
@@ -296,8 +290,32 @@ function drawTrendsTable(bucket) {
       <td>${s.mom_pct}%</td>
       <td>${s.qoq_pct}%</td>
       <td>${s.yoy_pct}%</td>
-    </tr>`).join("") || `<tr><td colspan="5">No services found in this category.</td></tr>`;
+    </tr>`).join("") || `<tr><td colspan="5">No matching services.</td></tr>`;
 }
+
+function initNav() {
+  const views = ["home", "going_up", "going_down", "not_used"];
+  const showView = (view) => {
+    views.forEach(v => {
+      document.getElementById(`view-${v}`).style.display = v === view ? "" : "none";
+    });
+    document.querySelectorAll("#main-nav .nav-btn").forEach(btn => {
+      btn.classList.toggle("active", btn.dataset.view === view);
+    });
+  };
+
+  document.querySelectorAll("#main-nav .nav-btn").forEach(btn => {
+    btn.onclick = () => {
+      location.hash = btn.dataset.view === "home" ? "" : btn.dataset.view;
+      showView(btn.dataset.view);
+    };
+  });
+
+  const initial = views.includes(location.hash.slice(1)) ? location.hash.slice(1) : "home";
+  showView(initial);
+}
+
+initNav();
 
 function guessNameField(account) {
   const key = Object.keys(account).find(k => /name/i.test(k) && typeof account[k] === "string");
