@@ -35,6 +35,11 @@ const settings = {
   // instead of calling any API. See data/ahs-5684700/README or .gitignore.
   csvDataDir: process.env.MSX_CSV_DATA_DIR || require("path").join(__dirname, "..", "data", "ahs-5684700"),
 
+  // Used in csv mode to split the exported "account team" opportunities into
+  // "mine" vs "team" for the Opportunities tabs. Matches the "Owner" column
+  // in MSX opportunity exports.
+  currentUserName: process.env.MSX_USER_NAME || "Satty Dhillon",
+
   get isLive() {
     return this.mode === "live";
   },

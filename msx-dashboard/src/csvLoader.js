@@ -7,6 +7,7 @@
  */
 const fs = require("fs");
 const path = require("path");
+const XLSX = require("xlsx");
 const settings = require("./config");
 
 /** Minimal CSV line parser supporting quoted fields containing commas. */
@@ -195,6 +196,65 @@ function getRecommendations() {
   return [...ri, ...sp].sort((a, b) => b.net_savings - a.net_savings);
 }
 
+/** Reads an MSX-exported .xlsx opportunity view (first sheet, header row 1)
+ * into an array of objects keyed by column header. Returns [] if missing. */
+function readXlsxRecords(fileName) {
+  const filePath = path.join(settings.csvDataDir, fileName);
+  if (!fs.existsSync(filePath)) return [];
+  const workbook = XLSX.readFile(filePath);
+  const sheet = workbook.Sheets[workbook.SheetNames[0]];
+  return XLSX.utils.sheet_to_json(sheet, { defval: "" });
+}
+
+/** Converts an Excel date serial number (or blank string) to "YYYY-MM-DD". */
+function formatExcelDate(value) {
+  if (!value || typeof value !== "number") return "";
+  const utcMs = Math.round((value - 25569) * 86400 * 1000);
+  return new Date(utcMs).toISOString().slice(0, 10);
+}
+
+/** Normalizes one row from an MSX opportunity export (either the
+ * "My/Account Team Opportunities" or "MyTeamOpportunities" shape) into the
+ * { name, owner_name, estimated_value, close_date, probability } shape the
+ * dashboard's Opportunities tabs already render. */
+function normalizeOpportunityRow(r) {
+  const estRevenue = toNumber(r["Est. Revenue"]);
+  const consumedRecurring = toNumber(r["Consumed Recurring"]);
+  return {
+    id: r["Opportunity Id"] || "",
+    name: r["Topic"] || "",
+    owner_name: r["Owner"] || r[" Full Name (Owning User) (User)"] || "",
+    estimated_value: Math.max(estRevenue, consumedRecurring),
+    close_date: formatExcelDate(r["Est. Close Date"]),
+    stage: r["Active Sales Stage[DISPLAY_USE_ONLY_Do_Not_Modify]"] || r["Pipeline Phase"] || "",
+    probability: null,
+  };
+}
+
+/** Builds My/Team/Highest-Value opportunity buckets from real MSX exports
+ * (Excel files a user downloads from their MSX opportunity views and drops
+ * into the csv data folder — see data/ahs-5684700/README). */
+function getOpportunities() {
+  const mine = readXlsxRecords("opportunities_my.xlsx").map(normalizeOpportunityRow);
+
+  const accountTeamRaw = readXlsxRecords("opportunities_account_team.xlsx");
+  const accountTeam = accountTeamRaw.map(normalizeOpportunityRow);
+  const mineIds = new Set(mine.map((o) => o.id));
+
+  // "Team" = the full account team's opportunities, excluding ones already
+  // shown under "mine" so the two tabs don't just duplicate each other.
+  const team = accountTeam.filter((o) => !mineIds.has(o.id));
+
+  // "Highest value" = every known opportunity for the account (mine + team),
+  // deduped, ranked by estimated value.
+  const combined = [...mine, ...accountTeam.filter((o) => o.id && !mineIds.has(o.id))];
+  const highestValue = [...combined].sort((a, b) => b.estimated_value - a.estimated_value).slice(0, 25);
+
+  if (mine.length === 0 && accountTeam.length === 0) return null;
+
+  return { mine, team, highest_value: highestValue };
+}
+
 function getDashboard(tpid) {
   const monthlyRevenue = getMonthlyRevenue();
   const lastMonth = monthlyRevenue[monthlyRevenue.length - 1];
@@ -220,6 +280,7 @@ function getDashboard(tpid) {
     service_trends: getServiceTrends(),
     subscriptions_summary: getSubscriptionsSummary(),
     recommendations,
+    opportunities_by_owner: getOpportunities(),
     rob_summary: {
       last_month_acr: lastMonth ? lastMonth.acr : null,
       ttm_acr: Math.round(totalTtm * 100) / 100,
