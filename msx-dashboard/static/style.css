@@ -127,3 +127,5 @@ th { color: var(--muted); font-weight: 600; }
   font-size: 0.95rem;
 }
 .filter-count { color: var(--muted); font-size: 0.85rem; }
+
+.forecast-row td { color: var(--muted); font-style: italic; background: #f8f9fb; }

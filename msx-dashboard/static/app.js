@@ -56,11 +56,32 @@ function renderCsvDashboard(data) {
     `<div class="stat"><div class="value">${value}</div><div class="label">${label}</div></div>`).join("");
 
   document.getElementById("revenue-card-title").textContent = "Monthly Azure Consumed Revenue (ACR)";
-  document.getElementById("revenue-table-head").innerHTML = "<th>Month</th><th>ACR</th>";
+  document.getElementById("revenue-table-head").innerHTML = "<th>Month</th><th>ACR</th><th>Type</th>";
   const revBody = document.querySelector("#revenue-table tbody");
-  revBody.innerHTML = (revenue_by_month || []).map(r => `
-    <tr><td>${r.month}</td><td>${formatCurrency(r.acr)}</td></tr>`).join("") ||
-    `<tr><td colspan="2">No revenue data available.</td></tr>`;
+
+  const actualRows = (revenue_by_month || [])
+    .map(r => ({ sortKey: r.month, month: r.month, acr: r.acr, forecast: false }))
+    .sort((a, b) => b.sortKey.localeCompare(a.sortKey)); // latest first
+
+  const lastActualMonth = revenue_by_month && revenue_by_month.length
+    ? revenue_by_month[revenue_by_month.length - 1].month
+    : null;
+
+  const forecastRows = data.azure_forecast
+    ? (data.azure_forecast.consumption_revenue || [])
+        .map(p => ({ ...p, sortKey: forecastMonthToSortKey(p.month) }))
+        .filter(p => p.is_forecast && lastActualMonth && p.sortKey > lastActualMonth)
+        .sort((a, b) => b.sortKey.localeCompare(a.sortKey)) // latest first
+        .map(p => ({ sortKey: p.sortKey, month: p.month, acr: p.value, forecast: true }))
+    : [];
+
+  const allRows = [...forecastRows, ...actualRows]; // forecast (future) on top, then actuals latest-first
+  revBody.innerHTML = allRows.map(r => `
+    <tr class="${r.forecast ? "forecast-row" : ""}">
+      <td>${r.month}</td>
+      <td>${formatCurrency(r.acr)}</td>
+      <td>${r.forecast ? "Forecast" : "Actual"}</td>
+    </tr>`).join("") || `<tr><td colspan="3">No revenue data available.</td></tr>`;
 
   toggle("opportunities-card", false);
 
@@ -113,6 +134,16 @@ function renderCsvDashboard(data) {
     trendsState = data.service_trends;
     ["going_up", "going_down", "not_used"].forEach(bucket => drawTrendsPage(bucket));
   }
+}
+
+const MONTH_ABBR = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+function forecastMonthToSortKey(label) {
+  // "Jul'26" -> "2026-07"
+  const match = /^([A-Za-z]{3})'(\d{2})$/.exec(label);
+  if (!match) return label;
+  const monthIdx = MONTH_ABBR.indexOf(match[1]);
+  const year = 2000 + parseInt(match[2], 10);
+  return `${year}-${String(monthIdx + 1).padStart(2, "0")}`;
 }
 
 let forecastChart = null;
