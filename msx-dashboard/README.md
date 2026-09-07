@@ -19,6 +19,24 @@ npm start
 
 Open http://127.0.0.1:8000 in your browser.
 
+## Live real data, without live API access: CSV mode
+
+If you can export data from MSX (grid → **Export to Excel/CSV**) but don't
+have API access yet, use `MSX_MODE=csv`:
+
+1. Export the relevant MSX views to CSV (Service Level ACR, Monthly Azure
+   Consumed Revenue, Subscriptions, RI/Savings Plan Recommendations, etc.)
+2. Put them in `msx-dashboard/data/ahs-<tpid>/` using these file names:
+   - `monthly_revenue.csv` (Azure consumed revenue, monthly)
+   - `service_level_acr.csv` (ACR broken out by service)
+   - `subscriptions.csv` (subscription list + consumption units)
+   - `ri_recommendations.csv`, `savings_plan_recommendations.csv`
+3. Set `MSX_MODE=csv` in `.env`, run `npm start`.
+
+**This folder is gitignored** (`data/`) — these exports are classified
+"Highly Confidential - Microsoft FTE" and must never be committed or pushed.
+They stay local to your machine only.
+
 ## Switching to live MSX data
 
 Your MSX org URL and the account entity are already pre-filled based on the

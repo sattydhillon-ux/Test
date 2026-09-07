@@ -71,6 +71,8 @@ table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
 th, td { text-align: left; padding: 8px; border-bottom: 1px solid #edebe9; }
 th { color: var(--muted); font-weight: 600; }
 
-#opportunities-card, #revenue-card { grid-column: span 2; }
+#opportunities-card, #revenue-card, #services-card, #subscriptions-card, #recommendations-card { grid-column: span 2; }
+
+.card h3 { margin: 16px 0 8px 0; font-size: 0.85rem; color: var(--muted); text-transform: uppercase; }
 
 .error { color: #a4262c; padding: 20px; }

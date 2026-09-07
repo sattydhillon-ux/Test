@@ -25,8 +25,15 @@ const settings = {
   tpidField: process.env.MSX_TPID_FIELD || "msp_tpid",
   targetTpid: process.env.MSX_TARGET_TPID || "5684700",
 
+  // "csv" mode: read real exported MSX CSVs from a local (gitignored) folder
+  // instead of calling any API. See data/ahs-5684700/README or .gitignore.
+  csvDataDir: process.env.MSX_CSV_DATA_DIR || require("path").join(__dirname, "..", "data", "ahs-5684700"),
+
   get isLive() {
     return this.mode === "live";
+  },
+  get isCsv() {
+    return this.mode === "csv";
   },
   get isDeviceCode() {
     return this.authMode === "device_code";

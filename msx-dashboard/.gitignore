@@ -1,2 +1,5 @@
 node_modules/
 .env
+
+# Confidential customer export data (MSX exports) — never commit these.
+data/

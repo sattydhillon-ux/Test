@@ -16,13 +16,115 @@ async function loadDashboard() {
 }
 
 function render(data) {
+  const { source } = data;
+  const badge = document.getElementById("mode-badge");
+  badge.textContent = source === "live" ? "Live MSX Data" : source === "csv" ? "Real Export (CSV)" : "Mock Data";
+
+  if (source === "csv") {
+    renderCsvDashboard(data);
+  } else {
+    renderMockOrLiveDashboard(data);
+  }
+}
+
+function toggle(id, show) {
+  document.getElementById(id).style.display = show ? "" : "none";
+}
+
+function renderCsvDashboard(data) {
+  const { account, revenue_by_month, top_services, subscriptions_summary, recommendations, rob_summary } = data;
+
+  document.getElementById("account-name").textContent = account.name || "Unknown Account";
+
+  const details = document.getElementById("account-details");
+  const fields = [
+    ["TPID", account.msp_tpid],
+    ["Segment", account.segment],
+    ["Region", account.region],
+    ["Data as of", account.data_as_of],
+  ].filter(([, v]) => v);
+  details.innerHTML = fields.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("");
+
+  const stats = document.getElementById("rob-stats");
+  const statFields = [
+    ["Last Month ACR", formatCurrency(rob_summary.last_month_acr)],
+    ["TTM ACR", formatCurrency(rob_summary.ttm_acr)],
+    ["YoY Growth", rob_summary.yoy_growth_pct !== null ? `${rob_summary.yoy_growth_pct}%` : "N/A"],
+    ["Potential Savings (3yr)", formatCurrency(rob_summary.total_potential_savings)],
+  ];
+  stats.innerHTML = statFields.map(([label, value]) =>
+    `<div class="stat"><div class="value">${value}</div><div class="label">${label}</div></div>`).join("");
+
+  document.getElementById("revenue-card-title").textContent = "Monthly Azure Consumed Revenue (ACR)";
+  document.getElementById("revenue-table-head").innerHTML = "<th>Month</th><th>ACR</th>";
+  const revBody = document.querySelector("#revenue-table tbody");
+  revBody.innerHTML = (revenue_by_month || []).map(r => `
+    <tr><td>${r.month}</td><td>${formatCurrency(r.acr)}</td></tr>`).join("") ||
+    `<tr><td colspan="2">No revenue data available.</td></tr>`;
+
+  toggle("opportunities-card", false);
+
+  toggle("services-card", true);
+  const svcBody = document.querySelector("#services-table tbody");
+  svcBody.innerHTML = (top_services || []).map(s => `
+    <tr>
+      <td>${s.service}</td>
+      <td>${formatCurrency(s.total_acr)}</td>
+      <td>${formatCurrency(s.last_month_acr)}</td>
+      <td>${s.mom_pct}%</td>
+      <td>${s.qoq_pct}%</td>
+      <td>${s.yoy_pct}%</td>
+    </tr>`).join("") || `<tr><td colspan="6">No service data available.</td></tr>`;
+
+  toggle("subscriptions-card", true);
+  const subStats = document.getElementById("subscriptions-stats");
+  const statusEntries = Object.entries(subscriptions_summary.status_counts || {});
+  subStats.innerHTML = [
+    ["Total Subscriptions", subscriptions_summary.total],
+    ...statusEntries.map(([status, count]) => [status, count]),
+  ].map(([label, value]) => `<div class="stat"><div class="value">${value}</div><div class="label">${label}</div></div>`).join("");
+
+  const subBody = document.querySelector("#subscriptions-table tbody");
+  subBody.innerHTML = (subscriptions_summary.top_subscriptions || []).map(s => `
+    <tr>
+      <td>${s.name}</td>
+      <td>${s.status}</td>
+      <td>${s.workload_type}</td>
+      <td>${Number(s.consumption_units).toLocaleString()}</td>
+    </tr>`).join("") || `<tr><td colspan="4">No subscription data available.</td></tr>`;
+
+  toggle("recommendations-card", true);
+  const recBody = document.querySelector("#recommendations-table tbody");
+  recBody.innerHTML = (recommendations || []).map(r => `
+    <tr>
+      <td>${r.type}</td>
+      <td>${r.description}</td>
+      <td>${r.term || ""}</td>
+      <td>${formatCurrency(r.net_savings, r.currency)}</td>
+      <td>${r.net_savings_pct !== null && r.net_savings_pct !== undefined ? r.net_savings_pct + "%" : ""}</td>
+    </tr>`).join("") || `<tr><td colspan="5">No recommendations available.</td></tr>`;
+}
+
+function formatCurrency(value, currency) {
+  if (value === null || value === undefined) return "N/A";
+  const prefix = currency && currency !== "CAD" ? `${currency} ` : "$";
+  return `${prefix}${Number(value).toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
+}
+
+function renderMockOrLiveDashboard(data) {
   const { account, revenue_by_year, opportunities, rob_summary, source } = data;
+
+  toggle("services-card", false);
+  toggle("subscriptions-card", false);
+  toggle("recommendations-card", false);
+  toggle("opportunities-card", true);
+  document.getElementById("revenue-card-title").textContent = "Revenue by Fiscal Year";
+  document.getElementById("revenue-table-head").innerHTML =
+    "<th>Fiscal Year</th><th>Actual ($M)</th><th>Target ($M)</th><th>Attainment</th>";
 
   const displayName =
     account.name || account.msp_name || account.msp_customer360name || guessNameField(account) || "Unknown Account";
   document.getElementById("account-name").textContent = displayName;
-  const badge = document.getElementById("mode-badge");
-  badge.textContent = source === "live" ? "Live MSX Data" : "Mock Data";
 
   const details = document.getElementById("account-details");
   const knownFields = [

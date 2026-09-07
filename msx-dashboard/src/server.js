@@ -3,6 +3,7 @@ const express = require("express");
 const settings = require("./config");
 const { getMockDashboard } = require("./mockData");
 const { getLiveDashboard, MsxAuthError, MsxApiError } = require("./msxClient");
+const { getDashboard: getCsvDashboard } = require("./csvLoader");
 
 const app = express();
 
@@ -12,6 +13,15 @@ app.get("/api/health", (req, res) => {
 
 app.get("/api/dashboard", async (req, res) => {
   const targetTpid = req.query.tpid || settings.targetTpid;
+
+  if (settings.isCsv) {
+    try {
+      return res.json(getCsvDashboard(targetTpid));
+    } catch (err) {
+      console.error(err);
+      return res.status(500).json({ detail: `Failed to read CSV data: ${err.message}` });
+    }
+  }
 
   if (!settings.isLive) {
     const data = getMockDashboard();

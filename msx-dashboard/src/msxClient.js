@@ -54,6 +54,12 @@ function getPublicApp() {
 // refresh before falling back to a fresh device-code prompt.
 let cachedAccount = null;
 
+// If a device-code sign-in is already in progress, concurrent callers must
+// await THIS SAME promise instead of starting their own flow — otherwise
+// each concurrent request mints a new code and invalidates the previous one
+// before the user can finish signing in with it.
+let inFlightDeviceCodeSignIn = null;
+
 async function getAccessTokenDeviceCode() {
   const app = getPublicApp();
   const scopes = [`${settings.orgUrl}/.default`];
@@ -68,19 +74,29 @@ async function getAccessTokenDeviceCode() {
     }
   }
 
-  try {
-    const result = await app.acquireTokenByDeviceCode({
-      scopes,
-      deviceCodeCallback: (response) => {
-        // eslint-disable-next-line no-console
-        console.log(`\n[MSX auth] ${response.message}\n`);
-      },
-    });
-    cachedAccount = result.account;
-    return result.accessToken;
-  } catch (err) {
-    throw new MsxAuthError(err.message || "Device code sign-in failed");
+  if (inFlightDeviceCodeSignIn) {
+    return inFlightDeviceCodeSignIn;
   }
+
+  inFlightDeviceCodeSignIn = (async () => {
+    try {
+      const result = await app.acquireTokenByDeviceCode({
+        scopes,
+        deviceCodeCallback: (response) => {
+          // eslint-disable-next-line no-console
+          console.log(`\n[MSX auth] ${response.message}\n`);
+        },
+      });
+      cachedAccount = result.account;
+      return result.accessToken;
+    } catch (err) {
+      throw new MsxAuthError(err.message || "Device code sign-in failed");
+    } finally {
+      inFlightDeviceCodeSignIn = null;
+    }
+  })();
+
+  return inFlightDeviceCodeSignIn;
 }
 
 async function getAccessTokenClientCredentials() {
