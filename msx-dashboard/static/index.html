@@ -31,6 +31,16 @@
       </table>
     </section>
 
+    <section class="card" id="forecast-card" style="display:none;">
+      <h2>Azure Forecast</h2>
+      <p class="hint" id="forecast-note"></p>
+      <div class="tabs" id="forecast-tabs">
+        <button class="tab-btn active" data-series="consumption_revenue">Azure Consumption Revenue</button>
+        <button class="tab-btn" data-series="consumption_units">Consumption Units</button>
+      </div>
+      <canvas id="forecast-chart" height="90"></canvas>
+    </section>
+
     <section class="card" id="opportunities-card">
       <h2>Open Opportunities</h2>
       <table id="opportunities-table">
@@ -66,6 +76,7 @@
     </section>
   </main>
 
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
   <script src="app.js"></script>
 </body>
 </html>

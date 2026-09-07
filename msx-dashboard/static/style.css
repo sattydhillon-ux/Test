@@ -76,3 +76,18 @@ th { color: var(--muted); font-weight: 600; }
 .card h3 { margin: 16px 0 8px 0; font-size: 0.85rem; color: var(--muted); text-transform: uppercase; }
 
 .error { color: #a4262c; padding: 20px; }
+
+.hint { color: var(--muted); font-size: 0.85rem; margin: -4px 0 12px; }
+
+.tabs { display: flex; gap: 8px; margin-bottom: 16px; border-bottom: 1px solid #e1dfdd; }
+.tab-btn {
+  background: none;
+  border: none;
+  padding: 8px 4px;
+  margin-right: 16px;
+  font-size: 0.95rem;
+  color: var(--muted);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+}
+.tab-btn.active { color: var(--ms-blue); border-bottom-color: var(--ms-blue); font-weight: 600; }

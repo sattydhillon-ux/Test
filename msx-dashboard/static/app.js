@@ -103,6 +103,79 @@ function renderCsvDashboard(data) {
       <td>${formatCurrency(r.net_savings, r.currency)}</td>
       <td>${r.net_savings_pct !== null && r.net_savings_pct !== undefined ? r.net_savings_pct + "%" : ""}</td>
     </tr>`).join("") || `<tr><td colspan="5">No recommendations available.</td></tr>`;
+
+  if (data.azure_forecast) {
+    toggle("forecast-card", true);
+    renderAzureForecast(data.azure_forecast);
+  }
+}
+
+let forecastChart = null;
+let forecastState = null;
+
+function renderAzureForecast(forecast) {
+  forecastState = forecast;
+  document.getElementById("forecast-note").textContent =
+    `${forecast.source_note} Updated ${forecast.updated_as_of}.`;
+
+  document.querySelectorAll("#forecast-tabs .tab-btn").forEach(btn => {
+    btn.onclick = () => {
+      document.querySelectorAll("#forecast-tabs .tab-btn").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      drawForecastChart(btn.dataset.series);
+    };
+  });
+
+  drawForecastChart("consumption_revenue");
+}
+
+function drawForecastChart(seriesKey) {
+  const series = forecastState[seriesKey] || [];
+  const forecastStart = series.findIndex(p => p.is_forecast);
+  const historical = series.map(p => (p.is_forecast ? null : p.value));
+  const forecastPts = series.map((p, i) => (p.is_forecast || i === forecastStart - 1 ? p.value : null));
+  const isRevenue = seriesKey === "consumption_revenue";
+
+  const ctx = document.getElementById("forecast-chart").getContext("2d");
+  if (forecastChart) forecastChart.destroy();
+  forecastChart = new Chart(ctx, {
+    type: "line",
+    data: {
+      labels: series.map(p => p.month),
+      datasets: [
+        {
+          label: isRevenue ? "Historical ACR (no adjustments)" : "Historical CU (no adjustments)",
+          data: historical,
+          borderColor: isRevenue ? "#0a2f66" : "#1e5c1e",
+          backgroundColor: "transparent",
+          spanGaps: false,
+          pointRadius: 2,
+          tension: 0.25,
+        },
+        {
+          label: "Machine learning forecast",
+          data: forecastPts,
+          borderColor: isRevenue ? "#5b9bd5" : "#7fbf7f",
+          backgroundColor: "transparent",
+          spanGaps: false,
+          pointRadius: 2,
+          tension: 0.25,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      interaction: { mode: "index", intersect: false },
+      plugins: { legend: { position: "bottom" } },
+      scales: {
+        y: {
+          ticks: {
+            callback: v => (isRevenue ? formatCurrency(v) : Number(v).toLocaleString()),
+          },
+        },
+      },
+    },
+  });
 }
 
 function formatCurrency(value, currency) {

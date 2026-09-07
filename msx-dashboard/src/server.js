@@ -4,6 +4,7 @@ const settings = require("./config");
 const { getMockDashboard } = require("./mockData");
 const { getLiveDashboard, MsxAuthError, MsxApiError } = require("./msxClient");
 const { getDashboard: getCsvDashboard } = require("./csvLoader");
+const { getAzureForecast } = require("./forecastData");
 
 const app = express();
 
@@ -16,7 +17,9 @@ app.get("/api/dashboard", async (req, res) => {
 
   if (settings.isCsv) {
     try {
-      return res.json(getCsvDashboard(targetTpid));
+      const data = getCsvDashboard(targetTpid);
+      data.azure_forecast = getAzureForecast();
+      return res.json(data);
     } catch (err) {
       console.error(err);
       return res.status(500).json({ detail: `Failed to read CSV data: ${err.message}` });
