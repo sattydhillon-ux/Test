@@ -17,6 +17,9 @@
     <button class="nav-btn" data-view="going_up">📈 Going Up</button>
     <button class="nav-btn" data-view="going_down">📉 Going Down</button>
     <button class="nav-btn" data-view="not_used">🚫 Not In Use</button>
+    <button class="nav-btn" data-view="my_opps">💰 My Opportunities</button>
+    <button class="nav-btn" data-view="team_opps">👥 Team Opportunities</button>
+    <button class="nav-btn" data-view="highest_opps">🏆 Highest Value</button>
   </nav>
 
   <main id="view-home" class="view">
@@ -120,6 +123,48 @@
       </div>
       <table id="not_used-table">
         <thead><tr><th>Service</th><th>Total ACR (historical)</th><th>Last Month ACR</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </section>
+  </main>
+
+  <main id="view-my_opps" class="view" style="display:none;">
+    <section class="card">
+      <h2>💰 My Opportunities by Value</h2>
+      <div class="filter-bar">
+        <input type="search" id="my_opps-filter" placeholder="Filter by opportunity name…" />
+        <span class="filter-count" id="my_opps-count"></span>
+      </div>
+      <table id="my_opps-table">
+        <thead><tr><th>Name</th><th>Est. Value</th><th>Close Date</th><th>Probability</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </section>
+  </main>
+
+  <main id="view-team_opps" class="view" style="display:none;">
+    <section class="card">
+      <h2>👥 My Team's Opportunities by Value</h2>
+      <div class="filter-bar">
+        <input type="search" id="team_opps-filter" placeholder="Filter by opportunity name or owner…" />
+        <span class="filter-count" id="team_opps-count"></span>
+      </div>
+      <table id="team_opps-table">
+        <thead><tr><th>Name</th><th>Owner</th><th>Est. Value</th><th>Close Date</th><th>Probability</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </section>
+  </main>
+
+  <main id="view-highest_opps" class="view" style="display:none;">
+    <section class="card">
+      <h2>🏆 Highest Value Opportunities</h2>
+      <div class="filter-bar">
+        <input type="search" id="highest_opps-filter" placeholder="Filter by opportunity name or owner…" />
+        <span class="filter-count" id="highest_opps-count"></span>
+      </div>
+      <table id="highest_opps-table">
+        <thead><tr><th>Name</th><th>Owner</th><th>Est. Value</th><th>Close Date</th><th>Probability</th></tr></thead>
         <tbody></tbody>
       </table>
     </section>

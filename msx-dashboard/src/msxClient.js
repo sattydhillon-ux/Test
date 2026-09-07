@@ -137,6 +137,74 @@ async function apiGet(path, params) {
   return res.json();
 }
 
+async function getWhoAmI() {
+  const result = await apiGet("WhoAmI()");
+  return result.UserId;
+}
+
+/** Team IDs the given user is a member of. */
+async function getUserTeamIds(userId) {
+  const result = await apiGet(`systemusers(${userId})/teammembership_association`, {
+    $select: "teamid",
+  });
+  return (result.value || []).map((t) => t.teamid);
+}
+
+/** All user IDs who are members of any of the given teams (excludes duplicates). */
+async function getTeamMemberUserIds(teamIds) {
+  const ids = new Set();
+  for (const teamId of teamIds) {
+    const result = await apiGet(`teams(${teamId})/teammembership_association`, {
+      $select: "systemuserid",
+    });
+    (result.value || []).forEach((u) => ids.add(u.systemuserid));
+  }
+  return ids;
+}
+
+/** Opportunities for the account, bucketed into mine / my team's / highest value.
+ * NOTE: opportunity entity/field names (parentaccountid, ownerid, estimatedvalue,
+ * etc.) are the standard Dataverse "opportunity" schema — confirm with your MSX
+ * admin if your org customizes them (see MSX_OPPORTUNITY_* env vars). */
+async function getOpportunitiesForAccount(accountId) {
+  const oppFilter = `_${settings.opportunityAccountLookupField}_value eq ${accountId} and statecode eq 0`;
+  const oppData = await apiGet(settings.opportunityEntitySet, {
+    $filter: oppFilter,
+    $select: "name,estimatedvalue,estimatedclosedate,closeprobability,statuscode,_ownerid_value",
+    $expand: "ownerid($select=fullname)",
+    $orderby: "estimatedvalue desc",
+  });
+  const opportunities = (oppData.value || []).map((o) => ({
+    name: o.name,
+    estimated_value: o.estimatedvalue,
+    close_date: o.estimatedclosedate,
+    probability: o.closeprobability,
+    stage: o["stepname"] || o.statuscode,
+    owner_id: o._ownerid_value,
+    owner_name: o["ownerid"] && o["ownerid"].fullname,
+  }));
+
+  let myUserId = null;
+  let teamMemberIds = new Set();
+  try {
+    myUserId = await getWhoAmI();
+    const teamIds = await getUserTeamIds(myUserId);
+    teamMemberIds = await getTeamMemberUserIds(teamIds);
+  } catch (err) {
+    // If WhoAmI/team lookups fail (permissions, schema mismatch), still return
+    // the highest-value bucket — just skip the mine/team buckets.
+    console.error("Failed to resolve current user/team for opportunity buckets:", err.message);
+  }
+
+  const mine = myUserId ? opportunities.filter((o) => o.owner_id === myUserId) : [];
+  const team = myUserId
+    ? opportunities.filter((o) => o.owner_id !== myUserId && teamMemberIds.has(o.owner_id))
+    : [];
+  const highestValue = [...opportunities].sort((a, b) => (b.estimated_value || 0) - (a.estimated_value || 0));
+
+  return { mine, team, highest_value: highestValue };
+}
+
 async function getLiveDashboard(tpid) {
   const filter = `${settings.tpidField} eq '${tpid}'`;
   const customerData = await apiGet(settings.entitySetName, {
@@ -151,10 +219,21 @@ async function getLiveDashboard(tpid) {
   }
   const record = records[0];
 
+  let opportunitiesByOwner = { mine: [], team: [], highest_value: [] };
+  const accountId = record[settings.opportunityAccountIdField];
+  if (accountId) {
+    try {
+      opportunitiesByOwner = await getOpportunitiesForAccount(accountId);
+    } catch (err) {
+      console.error("Failed to fetch opportunities:", err.message);
+    }
+  }
+
   return {
     account: record,
     revenue_by_year: [], // Populate from your MSX revenue/consumption entity
     opportunities: [], // Populate from your MSX opportunity/pipeline entity, filtered by this account
+    opportunities_by_owner: opportunitiesByOwner,
     rob_summary: {}, // Populate from your MSX ROB/consumption summary entity
     source: "live",
   };

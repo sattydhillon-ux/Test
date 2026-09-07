@@ -25,6 +25,8 @@ function render(data) {
   } else {
     renderMockOrLiveDashboard(data);
   }
+
+  renderOpportunityTabs(data);
 }
 
 function toggle(id, show) {
@@ -324,8 +326,56 @@ function renderTrendsRows(bucket, filterText) {
     </tr>`).join("") || `<tr><td colspan="5">No matching services.</td></tr>`;
 }
 
+let opportunitiesState = { mine: [], team: [], highest_value: [] };
+let opportunitiesAvailable = false;
+
+const OPP_BUCKET_CONFIG = {
+  my_opps: { key: "mine", showOwner: false, filterFields: ["name"] },
+  team_opps: { key: "team", showOwner: true, filterFields: ["name", "owner_name"] },
+  highest_opps: { key: "highest_value", showOwner: true, filterFields: ["name", "owner_name"] },
+};
+
+function renderOpportunityTabs(data) {
+  opportunitiesAvailable = !!data.opportunities_by_owner;
+  opportunitiesState = data.opportunities_by_owner || { mine: [], team: [], highest_value: [] };
+
+  Object.keys(OPP_BUCKET_CONFIG).forEach(view => {
+    const filterInput = document.getElementById(`${view}-filter`);
+    const render = () => renderOpportunityRows(view, filterInput.value.trim().toLowerCase());
+    filterInput.oninput = render;
+    render();
+  });
+}
+
+function renderOpportunityRows(view, filterText) {
+  const { key, showOwner, filterFields } = OPP_BUCKET_CONFIG[view];
+  const body = document.querySelector(`#${view}-table tbody`);
+  const countEl = document.getElementById(`${view}-count`);
+
+  if (!opportunitiesAvailable) {
+    countEl.textContent = "Not connected to live MSX data";
+    body.innerHTML = `<tr><td colspan="5">This tab needs a live MSX connection (opportunity/pipeline data with owner &amp; team info). Current mode doesn't provide it — switch MSX_MODE=live and sign in.</td></tr>`;
+    return;
+  }
+
+  const all = opportunitiesState[key] || [];
+  const rows = filterText
+    ? all.filter(o => filterFields.some(f => (o[f] || "").toLowerCase().includes(filterText)))
+    : all;
+  countEl.textContent = `${rows.length} of ${all.length} opportunities`;
+
+  body.innerHTML = rows.map(o => `
+    <tr>
+      <td>${o.name || ""}</td>
+      ${showOwner ? `<td>${o.owner_name || ""}</td>` : ""}
+      <td>${formatCurrency(o.estimated_value)}</td>
+      <td>${o.close_date || ""}</td>
+      <td>${o.probability ?? ""}${o.probability !== undefined && o.probability !== null ? "%" : ""}</td>
+    </tr>`).join("") || `<tr><td colspan="${showOwner ? 5 : 4}">No matching opportunities.</td></tr>`;
+}
+
 function initNav() {
-  const views = ["home", "going_up", "going_down", "not_used"];
+  const views = ["home", "going_up", "going_down", "not_used", "my_opps", "team_opps", "highest_opps"];
   const showView = (view) => {
     views.forEach(v => {
       document.getElementById(`view-${v}`).style.display = v === view ? "" : "none";

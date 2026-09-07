@@ -25,6 +25,12 @@ const settings = {
   tpidField: process.env.MSX_TPID_FIELD || "msp_tpid",
   targetTpid: process.env.MSX_TARGET_TPID || "5684700",
 
+  // Opportunity entity/fields — unconfirmed schema guesses (standard Dataverse
+  // "opportunity" entity). Adjust if your MSX org customizes these.
+  opportunityEntitySet: process.env.MSX_OPPORTUNITY_ENTITY_SET || "opportunities",
+  opportunityAccountLookupField: process.env.MSX_OPPORTUNITY_ACCOUNT_FIELD || "parentaccountid",
+  opportunityAccountIdField: process.env.MSX_ACCOUNT_ID_FIELD || "accountid",
+
   // "csv" mode: read real exported MSX CSVs from a local (gitignored) folder
   // instead of calling any API. See data/ahs-5684700/README or .gitignore.
   csvDataDir: process.env.MSX_CSV_DATA_DIR || require("path").join(__dirname, "..", "data", "ahs-5684700"),
